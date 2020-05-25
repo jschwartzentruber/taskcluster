@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"github.com/taskcluster/httpbackoff/v3"
-	"github.com/taskcluster/taskcluster/v29/workers/generic-worker/fileutil"
-	"github.com/taskcluster/taskcluster/v29/workers/generic-worker/tclog"
+	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/fileutil"
+	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/tclog"
 )
 
 // Utility function to aggressively download a url to a file location

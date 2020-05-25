@@ -10,8 +10,8 @@ import (
 	"os"
 	"reflect"
 
-	tcclient "github.com/taskcluster/taskcluster/v29/clients/client-go"
-	"github.com/taskcluster/taskcluster/v29/workers/generic-worker/fileutil"
+	tcclient "github.com/taskcluster/taskcluster/v30/clients/client-go"
+	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/fileutil"
 )
 
 type (

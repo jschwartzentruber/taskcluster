@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/taskcluster/httpbackoff/v3"
-	tcclient "github.com/taskcluster/taskcluster/v29/clients/client-go"
-	"github.com/taskcluster/taskcluster/v29/clients/client-go/tcqueue"
-	tchttputil "github.com/taskcluster/taskcluster/v29/workers/generic-worker/httputil"
-	"github.com/taskcluster/taskcluster/v29/workers/generic-worker/tclog"
+	tcclient "github.com/taskcluster/taskcluster/v30/clients/client-go"
+	"github.com/taskcluster/taskcluster/v30/clients/client-go/tcqueue"
+	tchttputil "github.com/taskcluster/taskcluster/v30/workers/generic-worker/httputil"
+	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/tclog"
 )
 
 type S3 struct {

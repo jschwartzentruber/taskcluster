@@ -3,8 +3,8 @@ package tcmock
 import (
 	"testing"
 
-	tcclient "github.com/taskcluster/taskcluster/v29/clients/client-go"
-	"github.com/taskcluster/taskcluster/v29/workers/generic-worker/tc"
+	tcclient "github.com/taskcluster/taskcluster/v30/clients/client-go"
+	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/tc"
 )
 
 type ServiceFactory struct {

@@ -3,7 +3,7 @@ package tcmock
 import (
 	"testing"
 
-	"github.com/taskcluster/taskcluster/v29/clients/client-go/tcauth"
+	"github.com/taskcluster/taskcluster/v30/clients/client-go/tcauth"
 )
 
 type Auth struct {

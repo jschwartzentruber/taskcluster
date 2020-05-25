@@ -3,7 +3,7 @@ package tcmock
 import (
 	"testing"
 
-	"github.com/taskcluster/taskcluster/v29/clients/client-go/tcsecrets"
+	"github.com/taskcluster/taskcluster/v30/clients/client-go/tcsecrets"
 )
 
 type Secrets struct {

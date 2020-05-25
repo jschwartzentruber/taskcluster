@@ -3,7 +3,7 @@ package tcmock
 import (
 	"testing"
 
-	"github.com/taskcluster/taskcluster/v29/clients/client-go/tcpurgecache"
+	"github.com/taskcluster/taskcluster/v30/clients/client-go/tcpurgecache"
 )
 
 type PurgeCache struct {

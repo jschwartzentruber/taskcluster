@@ -8,7 +8,7 @@ For documentation of the worker from a user's perspective, see the [online docum
 
 To see a full description of all the config options available to you, run `generic-worker --help`:
 ```
-generic-worker (multiuser engine) 29.6.0
+generic-worker (multiuser engine) 30.0.1
 
 generic-worker is a taskcluster worker that can run on any platform that supports go (golang).
 See http://taskcluster.github.io/generic-worker/ for more details. Essentially, the worker is
@@ -177,8 +177,8 @@ and reports back results to the queue.
                                             runTasksAsCurrentUser is true, the script will still
                                             be executed as the task user, rather than the
                                             current user (that runs the generic-worker process).
-          runTasksAsCurrentUser             If true, users will not be created for tasks, but
-                                            the current OS user will be used. [default: false]
+          runTasksAsCurrentUser             If true, users will still be created for tasks, but
+                                            tasks will be executed as the current OS user. [default: false]
           sentryProject                     The project name used in https://sentry.io for
                                             reporting worker crashes. Permission to publish
                                             crash reports is granted via the scope
@@ -258,7 +258,6 @@ and reports back results to the queue.
            generic-worker config file on the filesystem, a problem talking to AWS/GCP
            metadata service, or a problem retrieving config/files from the taskcluster
            secrets service.
-    65     Not able to install generic-worker on the system.
     67     A task user has been created, and the generic-worker needs to reboot in order
            to log on as the new task user. Note, the reboot happens automatically unless
            config setting disableReboots is set to true - in either code this exit code will
@@ -306,7 +305,7 @@ Set up to build Taskcluster in general.
 See [development process](../../dev-docs/development-process.md).
 
 * Run `go get github.com/taskcluster/livelog`
-* Run `go get github.com/taskcluster/taskcluster/v29/tools/taskcluster-proxy`
+ Run `go get github.com/taskcluster/taskcluster/v30/tools/taskcluster-proxy`
 
 In the `workers/generic-worker` directory, run `./build.sh` to check go version, generate code, build binaries, compile (but not run) tests, perform linting, and ensure there are no ineffective assignments in go code.
 
