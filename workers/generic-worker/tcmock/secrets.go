@@ -21,7 +21,6 @@ type Secrets struct {
 func NewSecrets() *Secrets {
 	return &Secrets{
 		Secrets: map[string]*tcsecrets.Secret{},
-		GetFunc: nil,
 	}
 }
 

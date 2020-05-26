@@ -14,6 +14,7 @@ import (
 	"github.com/taskcluster/slugid-go/slugid"
 	"github.com/taskcluster/taskcluster/v30/clients/client-go/tcworkermanager"
 	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/gwconfig"
+	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/tcmock"
 )
 
 type MockAWSProvisionedEnvironment struct {
@@ -183,6 +184,8 @@ func (m *MockAWSProvisionedEnvironment) Setup(t *testing.T) (teardown func(), er
 	// registered handler functions won't interfere with future tests that also
 	// use http.DefaultServeMux.
 	ec2MetadataHandler := http.NewServeMux()
+	secrets := tcmock.NewSecrets()
+	secrets.Handle(ec2MetadataHandler, t)
 	ec2MetadataHandler.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.EscapedPath() {
 
@@ -216,10 +219,6 @@ func (m *MockAWSProvisionedEnvironment) Setup(t *testing.T) (teardown func(), er
 
 		case "/api/worker-manager/v1/worker-pool/test-provisioner%2F" + workerType:
 			m.workerTypeDefinition(t, w)
-
-		// simulate taskcluster secrets endpoints
-		case "/api/secrets/v1/secret/worker-pool%3Atest-provisioner%2F" + workerType:
-			m.workerTypeSecret(t, w)
 
 		// simulate AWS endpoints
 		case "/latest/dynamic/instance-identity/document":
