@@ -626,7 +626,7 @@ func ensureCached(fsContent FSContent, task *TaskRun) (file string, err error) {
 	}
 	file, sha256, err = fsContent.Download(task)
 	if err != nil {
-		task.Errorf("Could not download %v to %v due to %v", fsContent.UniqueKey(), file, err)
+		task.Errorf("[mounts] Could not fetch from %v into file %v due to %v", fsContent, file, err)
 		return
 	}
 	fileCaches[cacheKey] = &Cache{

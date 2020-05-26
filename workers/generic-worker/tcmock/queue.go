@@ -65,6 +65,31 @@ func (queue *Queue) CreateArtifact(taskId, runId, name string, payload *tcqueue.
 	request.Name = name
 	if _, exists := queue.artifacts[taskId+":"+runId]; !exists {
 		queue.artifacts[taskId+":"+runId] = map[string]*tcqueue.Artifact{}
+	} else {
+		if c, exists := queue.artifacts[taskId+":"+runId][name]; exists {
+			switch c.StorageType {
+			case "reference":
+				if request.StorageType != "reference" {
+					queue.t.Logf("Request conflict: reference artifacts can only be replaced by other reference artifacts in taskId %v and runId: disallowing update %v -> %v", taskId, runId, *c, request)
+					return nil, &tcclient.APICallException{
+						CallSummary: &tcclient.CallSummary{},
+						RootCause: httpbackoff.BadHttpResponseCode{
+							HttpResponseCode: 409,
+						},
+					}
+				}
+			default:
+				if c.ContentType != request.ContentType || c.Expires != request.Expires || c.StorageType != request.StorageType {
+					queue.t.Logf("Request conflict: artifact for taskId %v and runId %v exists with different expiry/storage type/content type: %v vs %v", taskId, runId, *c, request)
+					return nil, &tcclient.APICallException{
+						CallSummary: &tcclient.CallSummary{},
+						RootCause: httpbackoff.BadHttpResponseCode{
+							HttpResponseCode: 409,
+						},
+					}
+				}
+			}
+		}
 	}
 	queue.artifacts[taskId+":"+runId][name] = &request
 	var response interface{}
@@ -155,6 +180,7 @@ func (queue *Queue) CreateTask(taskId string, payload *tcqueue.TaskDefinitionReq
 
 func (queue *Queue) GetLatestArtifact_SignedURL(taskId, name string, duration time.Duration) (*url.URL, error) {
 	// Returned URL only used for uploading artifacts, which is also mocked with URL ignored
+	queue.t.Log("queue.GetLatestArtifact_SignedURL called with taskId %v", taskId)
 	return &url.URL{}, nil
 }
 

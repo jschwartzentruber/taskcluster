@@ -206,8 +206,9 @@ func TestNonExistentArtifact(t *testing.T) {
 		t.Fatalf("Error when trying to read log file: %v", err)
 	}
 	logtext := string(bytes)
-	if !strings.Contains(logtext, "[mounts] Could not fetch from task "+taskID+" artifact SampleArtifacts/_/non-existent-artifact.txt into file") {
-		t.Fatalf("Log did not contain expected text:\n%v", logtext)
+	expectedText := "[mounts] Could not fetch from task " + taskID + " artifact SampleArtifacts/_/non-existent-artifact.txt into file"
+	if !strings.Contains(logtext, expectedText) {
+		t.Fatalf("Log did not contain expected text %q:\n%v", expectedText, logtext)
 	}
 }
 

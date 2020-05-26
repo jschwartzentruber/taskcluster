@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/taskcluster/httpbackoff/v3"
+	tcurls "github.com/taskcluster/taskcluster-lib-urls"
 	tcclient "github.com/taskcluster/taskcluster/v30/clients/client-go"
 	"github.com/taskcluster/taskcluster/v30/clients/client-go/tcqueue"
 )
@@ -420,11 +421,11 @@ func (task *TaskRun) uploadArtifact(artifact TaskArtifact) *CommandExecutionErro
 				if rootCause.HttpResponseCode == 409 {
 					fullError := fmt.Errorf(
 						"There was a conflict uploading artifact %v - this suggests artifact %v was already uploaded to this task with different content earlier on in this task.\n"+
-							"Check the artifacts section of the task payload at https://queue.taskcluster.net/v1/task/%v\n"+
+							"Check the artifacts section of the task payload at %v\n"+
 							"%v",
 						artifact.Base().Name,
 						artifact.Base().Name,
-						task.TaskID,
+						tcurls.API(config.RootURL, "queue", "v1", "task/"+task.TaskID),
 						rootCause,
 					)
 					return MalformedPayloadError(fullError)

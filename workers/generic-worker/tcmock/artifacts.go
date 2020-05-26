@@ -49,9 +49,11 @@ func (a *Artifacts) Publish(taskId string, runId uint, name, putURL, contentType
 }
 
 func (a *Artifacts) GetLatest(taskId, name, file string, timeout time.Duration, logger tclog.Logger) (sha256, contentEncoding, contentType string, err error) {
+	a.t.Logf("artifacts.GetLatest called with taskId %v", taskId)
 	if _, exists := a.artifacts[taskId+":"+name]; !exists {
 		a.t.Log("Returning error")
 		return "", "", "", &tcclient.APICallException{
+			CallSummary: &tcclient.CallSummary{},
 			RootCause: httpbackoff.BadHttpResponseCode{
 				HttpResponseCode: 404,
 			},
