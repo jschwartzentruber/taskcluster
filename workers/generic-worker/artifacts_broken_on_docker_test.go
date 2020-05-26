@@ -50,7 +50,7 @@ func TestPublicDirectoryArtifact(t *testing.T) {
 	}
 
 	if !a["public/build/X.txt"] || !a["public/logs/live.log"] || !a["public/logs/live_backing.log"] {
-		t.Fatalf("Wrong artifacts presented in task %v", taskID)
+		t.Fatalf("Wrong artifacts presented in task %v: %#v", taskID, a)
 	}
 }
 

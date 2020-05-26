@@ -56,11 +56,13 @@ func (queue *Queue) ClaimWork(provisionerId, workerType string, payload *tcqueue
 }
 
 func (queue *Queue) CreateArtifact(taskId, runId, name string, payload *tcqueue.PostArtifactRequest) (*tcqueue.PostArtifactResponse, error) {
+	queue.t.Logf("queue.CreateArtifact called with taskId %v and runId %v for artifact %v", taskId, runId, name)
 	var request tcqueue.Artifact
 	err := json.Unmarshal([]byte(*payload), &request)
 	if err != nil {
 		queue.t.Fatalf("Error unmarshalling from json: %v", err)
 	}
+	request.Name = name
 	if _, exists := queue.artifacts[taskId+":"+runId]; !exists {
 		queue.artifacts[taskId+":"+runId] = map[string]*tcqueue.Artifact{}
 	}
@@ -157,8 +159,9 @@ func (queue *Queue) GetLatestArtifact_SignedURL(taskId, name string, duration ti
 }
 
 func (queue *Queue) ListArtifacts(taskId, runId, continuationToken, limit string) (*tcqueue.ListArtifactsResponse, error) {
+	queue.t.Logf("queue.ListArtifacts called with taskId %v and runId %v", taskId, runId)
 	artifacts := []tcqueue.Artifact{}
-	for _, a := range queue.artifacts[taskId] {
+	for _, a := range queue.artifacts[taskId+":"+runId] {
 		artifacts = append(artifacts, *a)
 	}
 	return &tcqueue.ListArtifactsResponse{
