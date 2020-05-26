@@ -10,10 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/taskcluster/taskcluster/v30/clients/client-go/tcsecrets"
 	"github.com/taskcluster/taskcluster/v30/clients/client-go/tcworkermanager"
 	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/gwconfig"
-	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/tcmock"
 )
 
 type MockGCPProvisionedEnvironment struct {
@@ -21,8 +19,6 @@ type MockGCPProvisionedEnvironment struct {
 
 func (m *MockGCPProvisionedEnvironment) Setup(t *testing.T) func() {
 	teardown := setupEnvironment(t)
-	(serviceFactory.(*tcmock.ServiceFactory)).TCSecrets = tcsecrets.New(nil, "http://localhost:13243")
-	(serviceFactory.(*tcmock.ServiceFactory)).TCWorkerManager = tcworkermanager.New(nil, "http://localhost:13243")
 	workerType := testWorkerType()
 	configureForGCP = true
 	oldGCPMetadataBaseURL := GCPMetadataBaseURL

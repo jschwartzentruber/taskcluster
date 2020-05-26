@@ -70,7 +70,7 @@ func (queue *Queue) CreateArtifact(taskId, runId, name string, payload *tcqueue.
 			switch c.StorageType {
 			case "reference":
 				if request.StorageType != "reference" {
-					queue.t.Logf("Request conflict: reference artifacts can only be replaced by other reference artifacts in taskId %v and runId: disallowing update %v -> %v", taskId, runId, *c, request)
+					queue.t.Logf("Request conflict: reference artifacts can only be replaced by other reference artifacts in taskId %v and runId %v: disallowing update %v -> %v", taskId, runId, *c, request)
 					return nil, &tcclient.APICallException{
 						CallSummary: &tcclient.CallSummary{},
 						RootCause: httpbackoff.BadHttpResponseCode{
@@ -180,7 +180,7 @@ func (queue *Queue) CreateTask(taskId string, payload *tcqueue.TaskDefinitionReq
 
 func (queue *Queue) GetLatestArtifact_SignedURL(taskId, name string, duration time.Duration) (*url.URL, error) {
 	// Returned URL only used for uploading artifacts, which is also mocked with URL ignored
-	queue.t.Log("queue.GetLatestArtifact_SignedURL called with taskId %v", taskId)
+	queue.t.Logf("queue.GetLatestArtifact_SignedURL called with taskId %v", taskId)
 	return &url.URL{}, nil
 }
 

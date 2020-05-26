@@ -12,10 +12,8 @@ import (
 	"time"
 
 	"github.com/taskcluster/slugid-go/slugid"
-	"github.com/taskcluster/taskcluster/v30/clients/client-go/tcsecrets"
 	"github.com/taskcluster/taskcluster/v30/clients/client-go/tcworkermanager"
 	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/gwconfig"
-	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/tcmock"
 )
 
 type MockAWSProvisionedEnvironment struct {
@@ -168,8 +166,6 @@ func (m *MockAWSProvisionedEnvironment) PrivateHostSetup(t *testing.T) interface
 
 func (m *MockAWSProvisionedEnvironment) Setup(t *testing.T) (teardown func(), err error) {
 	td := setupEnvironment(t)
-	(serviceFactory.(*tcmock.ServiceFactory)).TCSecrets = tcsecrets.New(nil, "http://localhost:13243")
-	(serviceFactory.(*tcmock.ServiceFactory)).TCWorkerManager = tcworkermanager.New(nil, "http://localhost:13243")
 	workerType := testWorkerType()
 	configureForAWS = true
 	oldEC2MetadataBaseURL := EC2MetadataBaseURL
