@@ -16,8 +16,7 @@ Design goals:
    may bypass requirement for compatibility with a real taskcluster deployment
 
 At the current time, the following are _NOT_ design goals, due to the increased
-complexity that would be required to implement them. Perhaps in a future
-iteration this may change.
+complexity to implement. These may become design goals in the future.
 
 1) Mock services to be usable by both generic-worker and docker-worker tests
 2) Sharable tests between generic-worker and docker-worker
