@@ -18,6 +18,10 @@ func TestTaskclusterProxy(t *testing.T) {
 	////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////
+
+	// The following nonsense is to fool the linter that these go identifiers
+	// are used, since they are needed by tests that are currently skipped
+
 	GoEnv()
 	var x ExpectedArtifacts
 	if x == nil {
