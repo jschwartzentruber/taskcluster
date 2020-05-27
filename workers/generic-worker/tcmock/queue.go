@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,13 +26,42 @@ type Queue struct {
 func (q *Queue) Handle(handler *http.ServeMux, t *testing.T) {
 
 	const (
-		PingPath = "/ping"
-		// ClaimWorkPath        = "/claim-work/"
+		PingPath      = "/ping"
+		ClaimWorkPath = "/claim-work/"
 		// ProvisionersPath     = "/provisioners"
 		// ListProvisionersPath = "/provisioners/"
 		// TaskGroupPath        = "/task-group/"
 		// TaskPath             = "/task/"
 	)
+
+	handler.HandleFunc(ClaimWorkPath, func(w http.ResponseWriter, req *http.Request) {
+		workerPool := PathSuffix(t, req, ClaimWorkPath)
+		switch req.Method {
+		case "POST":
+			provisionerId, err := url.QueryUnescape(strings.SplitN(workerPool, "/", 2)[0])
+			if err != nil {
+				BadRequest(w, err)
+			}
+			workerType, err := url.QueryUnescape(strings.SplitN(workerPool, "/", 2)[1])
+			if err != nil {
+				BadRequest(w, err)
+			}
+			dec := json.NewDecoder(req.Body)
+			dec.DisallowUnknownFields()
+			var payload tcqueue.ClaimWorkRequest
+			err = dec.Decode(&payload)
+			if err != nil {
+				BadRequest(w, err)
+			}
+			resp, err := q.ClaimWork(provisionerId, workerType, &payload)
+			if err != nil {
+				BadRequest(w, err)
+			}
+			WriteAsJSON(t, w, resp)
+		default:
+			InvalidMethod(w, req)
+		}
+	})
 
 	handler.HandleFunc(PingPath, func(w http.ResponseWriter, req *http.Request) {
 		switch req.Method {
@@ -44,7 +74,7 @@ func (q *Queue) Handle(handler *http.ServeMux, t *testing.T) {
 }
 
 func (queue *Queue) Ping(t *testing.T, w http.ResponseWriter, req *http.Request) {
-
+	w.WriteHeader(200)
 }
 
 /////////////////////////////////////////////////

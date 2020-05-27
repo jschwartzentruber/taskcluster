@@ -96,6 +96,7 @@ This repository is used to develop, build, and release the Taskcluster services.
     * [Docker Worker](workers/docker-worker#readme)
     * [Generic Worker](workers/generic-worker#readme)
         * [workers/generic-worker/server-logs](workers/generic-worker/server-logs#readme)
+        * [Mock Services Design](workers/generic-worker/tcmock#readme)
 <!-- TOC END -->
 
 ## Team Mentions

@@ -23,6 +23,11 @@ func WriteAsJSON(t *testing.T, w http.ResponseWriter, resp interface{}) {
 	}
 }
 
+func BadRequest(w http.ResponseWriter, resp ...interface{}) {
+	w.WriteHeader(400)
+	fmt.Fprintf(w, "Bad request: %v", resp...)
+}
+
 func InvalidMethod(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(400)
 	fmt.Fprintf(w, "HTTP method %v not supported for request path %v", req.Method, req.URL.EscapedPath())
@@ -34,8 +39,8 @@ func NotImplemented(w http.ResponseWriter, req *http.Request, api string) {
 }
 
 func PathSuffix(t *testing.T, req *http.Request, prefix string) string {
-	if !strings.HasPrefix(req.URL.Path, prefix) {
-		t.Fatalf("BUG - URL %v does not have prefix %v", req.URL.Path, prefix)
+	if !strings.HasPrefix(req.URL.RawPath, prefix) {
+		t.Fatalf("BUG - URL path %v does not have prefix %v", req.URL.RawPath, prefix)
 	}
-	return req.URL.Path[len(prefix):]
+	return req.URL.RawPath[len(prefix):]
 }
