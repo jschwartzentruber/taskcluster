@@ -51,7 +51,7 @@ func incrementCounterInCache() []string {
 	return []string{command}
 }
 
-func goEnv() []string {
+func GoEnv() []string {
 	return []string{
 		"go env",
 		"set",

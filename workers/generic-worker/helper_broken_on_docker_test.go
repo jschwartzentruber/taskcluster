@@ -31,7 +31,7 @@ func checkSHA256(t *testing.T, sha256Hex string, file string) {
 	}
 }
 
-func cancelTask(t *testing.T) (td *tcqueue.TaskDefinitionRequest, payload GenericWorkerPayload) {
+func CancelTask(t *testing.T) (td *tcqueue.TaskDefinitionRequest, payload GenericWorkerPayload) {
 	// resolvetask is a go binary; source is in resolvetask subdirectory, binary is built in CI
 	// but if running test manually, you may need to explicitly build it first.
 	command := singleCommandNoArgs("resolvetask")
