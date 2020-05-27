@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,7 +15,12 @@ import (
 )
 
 type Queue struct {
-	t *testing.T
+	mu sync.RWMutex
+	t  *testing.T
+
+	// orderedTasks stores FIFO sorted taskIds since `range q.tasks` returns
+	// taskIds in an arbitrary order
+	orderedTasks []string
 
 	// tasks["<taskId>"]
 	tasks map[string]*tcqueue.TaskDefinitionAndStatus
@@ -80,9 +86,12 @@ func (queue *Queue) Ping(t *testing.T, w http.ResponseWriter, req *http.Request)
 /////////////////////////////////////////////////
 
 func (queue *Queue) ClaimWork(provisionerId, workerType string, payload *tcqueue.ClaimWorkRequest) (*tcqueue.ClaimWorkResponse, error) {
+	queue.mu.Lock()
+	defer queue.mu.Unlock()
 	maxTasks := payload.Tasks
 	tasks := []tcqueue.TaskClaim{}
-	for _, j := range queue.tasks {
+	for _, taskId := range queue.orderedTasks {
+		j := queue.tasks[taskId]
 		if j.Task.WorkerType == workerType && j.Task.ProvisionerID == provisionerId && j.Status.State == "pending" {
 			j.Status.State = "running"
 			j.Status.Runs = []tcqueue.RunInformation{
@@ -109,6 +118,8 @@ func (queue *Queue) ClaimWork(provisionerId, workerType string, payload *tcqueue
 }
 
 func (queue *Queue) CreateArtifact(taskId, runId, name string, payload *tcqueue.PostArtifactRequest) (*tcqueue.PostArtifactResponse, error) {
+	queue.mu.Lock()
+	defer queue.mu.Unlock()
 	queue.t.Logf("queue.CreateArtifact called with taskId %v and runId %v for artifact %v", taskId, runId, name)
 	var request tcqueue.Artifact
 	err := json.Unmarshal([]byte(*payload), &request)
@@ -189,6 +200,8 @@ func (queue *Queue) CreateArtifact(taskId, runId, name string, payload *tcqueue.
 }
 
 func (queue *Queue) CreateTask(taskId string, payload *tcqueue.TaskDefinitionRequest) (*tcqueue.TaskStatusResponse, error) {
+	queue.mu.Lock()
+	defer queue.mu.Unlock()
 	queue.tasks[taskId] = &tcqueue.TaskDefinitionAndStatus{
 		Status: tcqueue.TaskStatusStructure{
 			TaskID: taskId,
@@ -228,6 +241,7 @@ func (queue *Queue) CreateTask(taskId string, payload *tcqueue.TaskDefinitionReq
 			WorkerType:    payload.WorkerType,
 		},
 	}
+	queue.orderedTasks = append(queue.orderedTasks, taskId)
 	return tsr, nil
 }
 
@@ -238,6 +252,8 @@ func (queue *Queue) GetLatestArtifact_SignedURL(taskId, name string, duration ti
 }
 
 func (queue *Queue) ListArtifacts(taskId, runId, continuationToken, limit string) (*tcqueue.ListArtifactsResponse, error) {
+	queue.mu.RLock()
+	defer queue.mu.RUnlock()
 	queue.t.Logf("queue.ListArtifacts called with taskId %v and runId %v", taskId, runId)
 	artifacts := []tcqueue.Artifact{}
 	for _, a := range queue.artifacts[taskId+":"+runId] {
@@ -249,36 +265,48 @@ func (queue *Queue) ListArtifacts(taskId, runId, continuationToken, limit string
 }
 
 func (queue *Queue) ReclaimTask(taskId, runId string) (*tcqueue.TaskReclaimResponse, error) {
+	queue.mu.RLock()
+	defer queue.mu.RUnlock()
 	return &tcqueue.TaskReclaimResponse{
 		Status: queue.tasks[taskId].Status,
 	}, nil
 }
 
 func (queue *Queue) ReportCompleted(taskId, runId string) (*tcqueue.TaskStatusResponse, error) {
+	queue.mu.Lock()
 	queue.tasks[taskId].Status.Runs[0].ReasonResolved = "completed"
 	queue.tasks[taskId].Status.Runs[0].State = "completed"
+	queue.mu.Unlock()
 	return queue.Status(taskId)
 }
 
 func (queue *Queue) ReportException(taskId, runId string, payload *tcqueue.TaskExceptionRequest) (*tcqueue.TaskStatusResponse, error) {
+	queue.mu.Lock()
 	queue.tasks[taskId].Status.Runs[0].ReasonResolved = payload.Reason
 	queue.tasks[taskId].Status.Runs[0].State = "exception"
+	queue.mu.Unlock()
 	return queue.Status(taskId)
 }
 
 func (queue *Queue) ReportFailed(taskId, runId string) (*tcqueue.TaskStatusResponse, error) {
+	queue.mu.Lock()
 	queue.tasks[taskId].Status.Runs[0].ReasonResolved = "failed"
 	queue.tasks[taskId].Status.Runs[0].State = "failed"
+	queue.mu.Unlock()
 	return queue.Status(taskId)
 }
 
 func (queue *Queue) Status(taskId string) (*tcqueue.TaskStatusResponse, error) {
+	queue.mu.RLock()
+	defer queue.mu.RUnlock()
 	return &tcqueue.TaskStatusResponse{
 		Status: queue.tasks[taskId].Status,
 	}, nil
 }
 
 func (queue *Queue) Task(taskId string) (*tcqueue.TaskDefinitionResponse, error) {
+	queue.mu.RLock()
+	defer queue.mu.RUnlock()
 	if _, exists := queue.tasks[taskId]; !exists {
 		queue.t.Log("Returning error")
 		return nil, &tcclient.APICallException{

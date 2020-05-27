@@ -3,8 +3,11 @@ package httputil
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/taskcluster/httpbackoff/v3"
 	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/fileutil"
@@ -58,4 +61,18 @@ func DownloadFile(url, contentSource, file string, logger tclog.Logger) (sha256,
 	}
 	logger.Infof("[mounts] Downloaded %v bytes with SHA256 %v from %v to %v", contentSize, sha256, contentSource, file)
 	return
+}
+
+func WaitForLocalTCPListener(port uint16, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", "localhost:"+strconv.Itoa(int(port)), 60*time.Second)
+		if err != nil {
+			time.Sleep(100 * time.Millisecond)
+		} else {
+			_ = conn.Close()
+			return nil
+		}
+	}
+	return fmt.Errorf("Timed out waiting for port %v to be active after %v", port, timeout)
 }

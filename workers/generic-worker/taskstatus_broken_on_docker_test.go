@@ -51,7 +51,6 @@ func TestReclaimCancelledTask(t *testing.T) {
 	////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////
 	defer setup(t)()
-	defer setup(t)()
 	mounts := []MountEntry{
 		// requires scope "generic-worker:cache:banana-cache"
 		&WritableDirectoryCache{
