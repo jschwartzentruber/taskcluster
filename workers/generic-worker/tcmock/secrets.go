@@ -79,7 +79,7 @@ func (s *Secrets) List(t *testing.T, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	names := []string{}
-	for name, _ := range s.Secrets {
+	for name := range s.Secrets {
 		names = append(names, name)
 	}
 	list := &tcsecrets.SecretsList{
@@ -111,7 +111,7 @@ func (s *Secrets) Set(secret string, t *testing.T, w http.ResponseWriter, req *h
 	err := dec.Decode(&sec)
 	if err != nil {
 		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
+		_, _ = w.Write([]byte(err.Error()))
 		return
 	}
 	s.Secrets[secret] = &sec

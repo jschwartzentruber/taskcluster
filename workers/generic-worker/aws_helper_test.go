@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/taskcluster/slugid-go/slugid"
 	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/gwconfig"
 	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/tcmock"
 )
@@ -70,37 +69,6 @@ func WriteJSON(t *testing.T, w http.ResponseWriter, resp interface{}) {
 		t.Fatalf("Strange - I can't convert %#v to json: %v", resp, err)
 	}
 	_, _ = w.Write(bytes)
-}
-
-func (m *MockAWSProvisionedEnvironment) workerTypeDefinition(secret string, t *testing.T, w http.ResponseWriter, req *http.Request) {
-	resp := map[string]interface{}{
-		"config": map[string]interface{}{
-			"launchConfigs": []map[string]interface{}{
-				{
-					"workerConfig": map[string]interface{}{
-						"genericWorker": map[string]interface{}{
-							"config": map[string]interface{}{
-								"deploymentId": m.NewDeploymentID,
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	WriteJSON(t, w, resp)
-}
-
-func (m *MockAWSProvisionedEnvironment) credentials(t *testing.T, w http.ResponseWriter) {
-	resp := map[string]interface{}{
-		"credentials": map[string]string{
-			"clientId":    "fake-client-id",
-			"certificate": "fake-cert",
-			"accessToken": slugid.Nice(),
-		},
-		"scopes": []string{},
-	}
-	WriteJSON(t, w, resp)
 }
 
 func (m *MockAWSProvisionedEnvironment) userData(t *testing.T, w http.ResponseWriter, workerType string) {

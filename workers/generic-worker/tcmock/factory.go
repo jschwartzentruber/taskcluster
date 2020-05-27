@@ -10,7 +10,6 @@ import (
 )
 
 type ServiceFactory struct {
-	t             *testing.T
 	auth          tc.Auth
 	queue         tc.Queue
 	secrets       tc.Secrets

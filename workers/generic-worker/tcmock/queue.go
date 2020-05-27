@@ -2,6 +2,7 @@ package tcmock
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/url"
 	"testing"
 	"time"
@@ -19,9 +20,23 @@ type Queue struct {
 
 	// artifacts["<taskId>:<runId>"]["<name>"]
 	artifacts map[string]map[string]*tcqueue.Artifact
+}
 
-	// artifactContent["<taskId>:<runId>:<name>"]
-	artifactContent map[string][]byte
+func (q *Queue) Handle(handler *http.ServeMux, t *testing.T) {
+
+	const (
+		ClaimWorkPath        = "/claim-work/"
+		PendingPath          = "/pending/"
+		PingPath             = "/ping"
+		ProvisionersPath     = "/provisioners"
+		ListProvisionersPath = "/provisioners/"
+		TaskGroupPath        = "/task-group/"
+		TaskPath             = "/task/"
+	)
+}
+
+func (queue *Queue) Ping(t *testing.T, w http.ResponseWriter, req *http.Request) {
+
 }
 
 /////////////////////////////////////////////////
