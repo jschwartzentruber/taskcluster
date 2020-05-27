@@ -38,6 +38,9 @@ func NotImplemented(w http.ResponseWriter, req *http.Request, api string) {
 	fmt.Fprintf(w, "API method %v not yet implemented for HTTP method %v and request path %v", api, req.Method, req.URL.EscapedPath())
 }
 
+// PathSuffix differs from http.StripPrefix by considering req.URL.RawPath
+// rather than req.URL.Path, in order that path elements may contain forward
+// slashes.
 func PathSuffix(t *testing.T, req *http.Request, prefix string) string {
 	if !strings.HasPrefix(req.URL.RawPath, prefix) {
 		t.Fatalf("BUG - URL path %v does not have prefix %v", req.URL.RawPath, prefix)
