@@ -30,7 +30,7 @@ func InvalidMethod(w http.ResponseWriter, req *http.Request) {
 
 func NotImplemented(w http.ResponseWriter, req *http.Request, api string) {
 	w.WriteHeader(501)
-	fmt.Fprintf(w, "API method %v not yet implemented for request path %v", api, req.Method, req.URL.EscapedPath())
+	fmt.Fprintf(w, "API method %v not yet implemented for HTTP method %v and request path %v", api, req.Method, req.URL.EscapedPath())
 }
 
 func PathSuffix(t *testing.T, req *http.Request, prefix string) string {
