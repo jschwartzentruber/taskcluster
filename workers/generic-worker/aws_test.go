@@ -34,7 +34,7 @@ func TestNoPublicConfig(t *testing.T) {
 
 func TestNoWorkerTypeSecret(t *testing.T) {
 	m := &MockAWSProvisionedEnvironment{}
-	m.WorkerTypeSecretFunc = func(t *testing.T, w http.ResponseWriter) {
+	m.WorkerTypeSecretFunc = func(secret string, t *testing.T, w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(404)
 	}
 	teardown, err := m.Setup(t)
@@ -44,7 +44,7 @@ func TestNoWorkerTypeSecret(t *testing.T) {
 
 func TestSecretServiceError(t *testing.T) {
 	m := &MockAWSProvisionedEnvironment{}
-	m.WorkerTypeSecretFunc = func(t *testing.T, w http.ResponseWriter) {
+	m.WorkerTypeSecretFunc = func(secret string, t *testing.T, w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(403)
 	}
 	teardown, err := m.Setup(t)
@@ -96,7 +96,7 @@ func TestInvalidWorkerTypeDefinitionFiles(t *testing.T) {
 
 func TestAdditionalFieldInWorkerTypeSecret(t *testing.T) {
 	m := &MockAWSProvisionedEnvironment{}
-	m.WorkerTypeSecretFunc = func(t *testing.T, w http.ResponseWriter) {
+	m.WorkerTypeSecretFunc = func(secret string, t *testing.T, w http.ResponseWriter, req *http.Request) {
 		// start with default private host setup data
 		data := m.PrivateHostSetup(t).(map[string]interface{})
 		// then add an additional field to top level, that shouldn't be there

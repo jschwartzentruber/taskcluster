@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"github.com/taskcluster/slugid-go/slugid"
-	"github.com/taskcluster/taskcluster/v30/clients/client-go/tcworkermanager"
 	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/gwconfig"
 	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/tcmock"
 )
@@ -22,7 +20,7 @@ type MockAWSProvisionedEnvironment struct {
 	PrivateFiles                     []map[string]string
 	PublicConfig                     map[string]interface{}
 	PrivateConfig                    map[string]interface{}
-	WorkerTypeSecretFunc             func(t *testing.T, w http.ResponseWriter)
+	WorkerTypeSecretFunc             func(secret string, t *testing.T, w http.ResponseWriter, req *http.Request)
 	WorkerTypeDefinitionUserDataFunc func(t *testing.T) interface{}
 	Terminating                      bool
 	PretendMetadata                  string
@@ -74,7 +72,7 @@ func WriteJSON(t *testing.T, w http.ResponseWriter, resp interface{}) {
 	_, _ = w.Write(bytes)
 }
 
-func (m *MockAWSProvisionedEnvironment) workerTypeDefinition(t *testing.T, w http.ResponseWriter) {
+func (m *MockAWSProvisionedEnvironment) workerTypeDefinition(secret string, t *testing.T, w http.ResponseWriter, req *http.Request) {
 	resp := map[string]interface{}{
 		"config": map[string]interface{}{
 			"launchConfigs": []map[string]interface{}{
@@ -101,18 +99,6 @@ func (m *MockAWSProvisionedEnvironment) credentials(t *testing.T, w http.Respons
 			"accessToken": slugid.Nice(),
 		},
 		"scopes": []string{},
-	}
-	WriteJSON(t, w, resp)
-}
-
-func (m *MockAWSProvisionedEnvironment) workerTypeSecret(t *testing.T, w http.ResponseWriter) {
-	if m.WorkerTypeSecretFunc != nil {
-		m.WorkerTypeSecretFunc(t, w)
-		return
-	}
-	resp := map[string]interface{}{
-		"secret":  m.PrivateHostSetup(t),
-		"expires": "2077-08-19T00:00:00.000Z",
 	}
 	WriteJSON(t, w, resp)
 }
@@ -183,42 +169,27 @@ func (m *MockAWSProvisionedEnvironment) Setup(t *testing.T) (teardown func(), er
 	// Create custom *http.ServeMux rather than using http.DefaultServeMux, so
 	// registered handler functions won't interfere with future tests that also
 	// use http.DefaultServeMux.
-	ec2MetadataHandler := http.NewServeMux()
+	mocksHandler := http.NewServeMux()
 	secrets := tcmock.NewSecrets()
-	secrets.Handle(ec2MetadataHandler, t)
-	ec2MetadataHandler.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+	secrets.GetFunc = func(secret string, t *testing.T, w http.ResponseWriter, req *http.Request) {
+		if m.WorkerTypeSecretFunc != nil {
+			m.WorkerTypeSecretFunc(secret, t, w, req)
+			return
+		}
+		resp := map[string]interface{}{
+			"secret":  m.PrivateHostSetup(t),
+			"expires": "2077-08-19T00:00:00.000Z",
+		}
+		WriteJSON(t, w, resp)
+	}
+	secrets.Handle(mocksHandler, t)
+	wm := &tcmock.WorkerManager{
+		NewDeploymentID: m.NewDeploymentID,
+	}
+	wm.Handle(mocksHandler, t)
+
+	mocksHandler.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.EscapedPath() {
-
-		// simulate worker-manager endpoints
-		case "/api/worker-manager/v1/worker/register":
-			if req.Method != "POST" {
-				w.WriteHeader(400)
-				fmt.Fprintf(w, "Must register with POST")
-			}
-			d := json.NewDecoder(req.Body)
-			d.DisallowUnknownFields()
-			b := tcworkermanager.RegisterWorkerRequest{}
-			err := d.Decode(&b)
-			if err != nil {
-				w.WriteHeader(400)
-				fmt.Fprintf(w, "%v", err)
-			}
-			d = json.NewDecoder(bytes.NewBuffer(b.WorkerIdentityProof))
-			d.DisallowUnknownFields()
-			g := tcworkermanager.AwsProviderType{}
-			err = d.Decode(&g)
-			if err != nil {
-				w.WriteHeader(400)
-				fmt.Fprintf(w, "%v", err)
-			}
-			if g.Signature != "test-signature" {
-				w.WriteHeader(400)
-				fmt.Fprintf(w, "Got signature %q but was expecting %q", g.Signature, "test-signature")
-			}
-			m.credentials(t, w)
-
-		case "/api/worker-manager/v1/worker-pool/test-provisioner%2F" + workerType:
-			m.workerTypeDefinition(t, w)
 
 		// simulate AWS endpoints
 		case "/latest/dynamic/instance-identity/document":
@@ -267,7 +238,7 @@ func (m *MockAWSProvisionedEnvironment) Setup(t *testing.T) (teardown func(), er
 
 	s := &http.Server{
 		Addr:           "localhost:13243",
-		Handler:        ec2MetadataHandler,
+		Handler:        mocksHandler,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,

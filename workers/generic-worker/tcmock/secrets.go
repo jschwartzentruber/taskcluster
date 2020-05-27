@@ -37,7 +37,7 @@ func (s *Secrets) Handle(handler *http.ServeMux, t *testing.T) {
 		case "GET":
 			s.Ping(t, w, req)
 		default:
-			w.WriteHeader(400)
+			InvalidMethod(w, req)
 		}
 	})
 
@@ -46,12 +46,12 @@ func (s *Secrets) Handle(handler *http.ServeMux, t *testing.T) {
 		case "GET":
 			s.List(t, w, req)
 		default:
-			w.WriteHeader(400)
+			InvalidMethod(w, req)
 		}
 	})
 
 	handler.HandleFunc(SecretPath, func(w http.ResponseWriter, req *http.Request) {
-		secret := req.URL.EscapedPath()[len(SecretPath):]
+		secret := PathSuffix(t, req, SecretPath)
 		switch req.Method {
 		case "GET":
 			s.Get(secret, t, w, req)
@@ -60,7 +60,7 @@ func (s *Secrets) Handle(handler *http.ServeMux, t *testing.T) {
 		case "DELETE":
 			s.Remove(secret, t, w, req)
 		default:
-			w.WriteHeader(400)
+			InvalidMethod(w, req)
 		}
 	})
 }
