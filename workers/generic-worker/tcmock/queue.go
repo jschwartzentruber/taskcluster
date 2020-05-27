@@ -25,14 +25,22 @@ type Queue struct {
 func (q *Queue) Handle(handler *http.ServeMux, t *testing.T) {
 
 	const (
-		ClaimWorkPath        = "/claim-work/"
-		PendingPath          = "/pending/"
-		PingPath             = "/ping"
-		ProvisionersPath     = "/provisioners"
-		ListProvisionersPath = "/provisioners/"
-		TaskGroupPath        = "/task-group/"
-		TaskPath             = "/task/"
+		PingPath = "/ping"
+		// ClaimWorkPath        = "/claim-work/"
+		// ProvisionersPath     = "/provisioners"
+		// ListProvisionersPath = "/provisioners/"
+		// TaskGroupPath        = "/task-group/"
+		// TaskPath             = "/task/"
 	)
+
+	handler.HandleFunc(PingPath, func(w http.ResponseWriter, req *http.Request) {
+		switch req.Method {
+		case "GET":
+			q.Ping(t, w, req)
+		default:
+			InvalidMethod(w, req)
+		}
+	})
 }
 
 func (queue *Queue) Ping(t *testing.T, w http.ResponseWriter, req *http.Request) {
