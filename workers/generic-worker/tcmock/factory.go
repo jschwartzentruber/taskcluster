@@ -19,13 +19,14 @@ type ServiceFactory struct {
 }
 
 func NewServiceFactory(t *testing.T) *ServiceFactory {
+	queue := NewQueue(t)
 	return &ServiceFactory{
 		auth:          NewAuth(t),
-		queue:         NewQueue(t),
+		queue:         queue,
 		secrets:       tcsecrets.New(nil, "http://localhost:13243"),
 		purgeCache:    NewPurgeCache(t),
 		workerManager: tcworkermanager.New(nil, "http://localhost:13243"),
-		artifacts:     NewArtifacts(t),
+		artifacts:     NewArtifacts(t, queue),
 	}
 }
 

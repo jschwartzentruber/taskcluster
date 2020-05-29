@@ -2,8 +2,10 @@ package tcmock
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -26,7 +28,7 @@ type Queue struct {
 	tasks map[string]*tcqueue.TaskDefinitionAndStatus
 
 	// artifacts["<taskId>:<runId>"]["<name>"]
-	artifacts map[string]map[string]*tcqueue.Artifact
+	artifacts map[string]map[string]interface{}
 }
 
 func (q *Queue) Handle(handler *http.ServeMux, t *testing.T) {
@@ -121,82 +123,121 @@ func (queue *Queue) CreateArtifact(taskId, runId, name string, payload *tcqueue.
 	queue.mu.Lock()
 	defer queue.mu.Unlock()
 	queue.t.Logf("queue.CreateArtifact called with taskId %v and runId %v for artifact %v", taskId, runId, name)
+
+	if _, mapAlreadyCreated := queue.artifacts[taskId+":"+runId]; !mapAlreadyCreated {
+		queue.artifacts[taskId+":"+runId] = map[string]interface{}{}
+	}
+
 	var request tcqueue.Artifact
 	err := json.Unmarshal([]byte(*payload), &request)
 	if err != nil {
 		queue.t.Fatalf("Error unmarshalling from json: %v", err)
 	}
-	request.Name = name
-	if _, exists := queue.artifacts[taskId+":"+runId]; !exists {
-		queue.artifacts[taskId+":"+runId] = map[string]*tcqueue.Artifact{}
-	} else {
-		if c, exists := queue.artifacts[taskId+":"+runId][name]; exists {
-			switch c.StorageType {
-			case "reference":
-				if request.StorageType != "reference" {
-					queue.t.Logf("Request conflict: reference artifacts can only be replaced by other reference artifacts in taskId %v and runId %v: disallowing update %v -> %v", taskId, runId, *c, request)
-					return nil, &tcclient.APICallException{
-						CallSummary: &tcclient.CallSummary{},
-						RootCause: httpbackoff.BadHttpResponseCode{
-							HttpResponseCode: 409,
-						},
-					}
-				}
-			default:
-				if c.ContentType != request.ContentType || c.Expires != request.Expires || c.StorageType != request.StorageType {
-					queue.t.Logf("Request conflict: artifact for taskId %v and runId %v exists with different expiry/storage type/content type: %v vs %v", taskId, runId, *c, request)
-					return nil, &tcclient.APICallException{
-						CallSummary: &tcclient.CallSummary{},
-						RootCause: httpbackoff.BadHttpResponseCode{
-							HttpResponseCode: 409,
-						},
-					}
-				}
-			}
-		}
-	}
-	queue.artifacts[taskId+":"+runId][name] = &request
-	var response interface{}
+
+	var req, resp interface{}
 	switch request.StorageType {
 	case "s3":
 		var s3Request tcqueue.S3ArtifactRequest
-		err := json.Unmarshal([]byte(*payload), &s3Request)
+		err = json.Unmarshal([]byte(*payload), &s3Request)
 		if err != nil {
 			queue.t.Fatalf("Error unmarshalling S3 Artifact Request from json: %v", err)
 		}
-		response = tcqueue.S3ArtifactResponse{
-			ContentType: s3Request.ContentType,
-			Expires:     s3Request.Expires,
-			PutURL:      "http://localhost:12453",
-			StorageType: s3Request.StorageType,
-		}
+		req = &s3Request
+		resp, err = queue.createS3Artifact(taskId, runId, name, &s3Request)
 	case "error":
 		var errorRequest tcqueue.ErrorArtifactRequest
-		err := json.Unmarshal([]byte(*payload), &errorRequest)
+		err = json.Unmarshal([]byte(*payload), &errorRequest)
 		if err != nil {
 			queue.t.Fatalf("Error unmarshalling Error Artifact Request from json: %v", err)
 		}
-		response = tcqueue.ErrorArtifactResponse{
-			StorageType: errorRequest.StorageType,
-		}
+		req = &errorRequest
+		resp, err = queue.createErrorArtifact(taskId, runId, name, &errorRequest)
 	case "reference":
 		var redirectRequest tcqueue.RedirectArtifactRequest
-		err := json.Unmarshal([]byte(*payload), &redirectRequest)
+		err = json.Unmarshal([]byte(*payload), &redirectRequest)
 		if err != nil {
 			queue.t.Fatalf("Error unmarshalling Redirect Artifact Request from json: %v", err)
 		}
-		response = tcqueue.RedirectArtifactResponse{
-			StorageType: redirectRequest.StorageType,
-		}
+		req = &redirectRequest
+		resp, err = queue.createRedirectArtifact(taskId, runId, name, &redirectRequest)
 	default:
 		queue.t.Fatalf("Unrecognised storage type: %v", request.StorageType)
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	queue.artifacts[taskId+":"+runId][name] = req
+	queue.t.Logf("Added artifact %v for task %v run %v artifact %v", req, taskId, runId, name)
+
 	var par tcqueue.PostArtifactResponse
-	par, err = json.Marshal(response)
+	par, err = json.Marshal(resp)
 	if err != nil {
 		queue.t.Fatalf("Error marshalling into json: %v", err)
 	}
 	return &par, nil
+}
+
+func (queue *Queue) ensureUnchangedIfAlreadyExists(taskId, runId, name string, request interface{}) error {
+	previousVersion, existed := queue.artifacts[taskId+":"+runId][name]
+	if !existed || reflect.DeepEqual(previousVersion, request) {
+		return nil
+	}
+	return &tcclient.APICallException{
+		CallSummary: &tcclient.CallSummary{
+			HTTPResponseBody: fmt.Sprintf("Request conflict: artifact %v in taskId %v and runId %v exists with different values: disallowing update %v -> %v", name, taskId, runId, previousVersion, request),
+		},
+		RootCause: httpbackoff.BadHttpResponseCode{
+			HttpResponseCode: 409,
+		},
+	}
+}
+
+func (queue *Queue) createS3Artifact(taskId, runId, name string, s3Request *tcqueue.S3ArtifactRequest) (*tcqueue.S3ArtifactResponse, error) {
+	err := queue.ensureUnchangedIfAlreadyExists(taskId, runId, name, s3Request)
+	if err != nil {
+		return nil, err
+	}
+	return &tcqueue.S3ArtifactResponse{
+		ContentType: s3Request.ContentType,
+		Expires:     s3Request.Expires,
+		PutURL:      "http://localhost:12453",
+		StorageType: s3Request.StorageType,
+	}, nil
+}
+
+func (queue *Queue) createErrorArtifact(taskId, runId, name string, errorRequest *tcqueue.ErrorArtifactRequest) (*tcqueue.ErrorArtifactResponse, error) {
+	err := queue.ensureUnchangedIfAlreadyExists(taskId, runId, name, errorRequest)
+	if err != nil {
+		return nil, err
+	}
+	return &tcqueue.ErrorArtifactResponse{
+		StorageType: errorRequest.StorageType,
+	}, nil
+}
+
+func (queue *Queue) createRedirectArtifact(taskId, runId, name string, redirectRequest *tcqueue.RedirectArtifactRequest) (*tcqueue.RedirectArtifactResponse, error) {
+	previousVersion, existed := queue.artifacts[taskId+":"+runId][name]
+	if !existed {
+		return &tcqueue.RedirectArtifactResponse{
+			StorageType: redirectRequest.StorageType,
+		}, nil
+	}
+	if _, wasRedirect := previousVersion.(*tcqueue.RedirectArtifactRequest); wasRedirect {
+		// new reference artifact allowed with different URL / Content Type / Expiry
+		return &tcqueue.RedirectArtifactResponse{
+			StorageType: redirectRequest.StorageType,
+		}, nil
+	}
+	return nil, &tcclient.APICallException{
+		CallSummary: &tcclient.CallSummary{
+			HTTPResponseBody: fmt.Sprintf("Request conflict: redirect artifact %v in taskId %v and runId %v cannot replace a non-redirect artifact: disallowing update %v -> %v", name, taskId, runId, previousVersion, redirectRequest),
+		},
+		RootCause: httpbackoff.BadHttpResponseCode{
+			HttpResponseCode: 409,
+		},
+	}
 }
 
 func (queue *Queue) CreateTask(taskId string, payload *tcqueue.TaskDefinitionRequest) (*tcqueue.TaskStatusResponse, error) {
@@ -246,9 +287,39 @@ func (queue *Queue) CreateTask(taskId string, payload *tcqueue.TaskDefinitionReq
 }
 
 func (queue *Queue) GetLatestArtifact_SignedURL(taskId, name string, duration time.Duration) (*url.URL, error) {
-	// Returned URL only used for uploading artifacts, which is also mocked with URL ignored
+	queue.mu.RLock()
+	defer queue.mu.RUnlock()
 	queue.t.Logf("queue.GetLatestArtifact_SignedURL called with taskId %v", taskId)
-	return &url.URL{}, nil
+	taskRunArtifacts, exists := queue.artifacts[taskId+":0"]
+	if !exists {
+		queue.t.Logf("No artifacts for task %v (runId 0) found", taskId)
+		return nil, &tcclient.APICallException{
+			RootCause: httpbackoff.BadHttpResponseCode{
+				HttpResponseCode: 404,
+			},
+		}
+	}
+	artifact, exists := taskRunArtifacts[name]
+	if !exists {
+		queue.t.Logf("Task %v (runId 0) found, but does not have artifact %v", taskId, name)
+		return nil, &tcclient.APICallException{
+			RootCause: httpbackoff.BadHttpResponseCode{
+				HttpResponseCode: 404,
+			},
+		}
+	}
+	switch a := artifact.(type) {
+	case *tcqueue.S3ArtifactRequest:
+		// nil simply signifies to mocks that the artifact isn't a redirect artifact
+		return nil, nil
+	case *tcqueue.ErrorArtifactRequest:
+		// nil simply signifies to mocks that the artifact isn't a redirect artifact
+		return nil, nil
+	case *tcqueue.RedirectArtifactRequest:
+		return url.Parse(a.URL)
+	}
+	queue.t.Fatalf("Unknown artifact type %T", artifact)
+	return nil, fmt.Errorf("Unknown artifact type %T", artifact)
 }
 
 func (queue *Queue) ListArtifacts(taskId, runId, continuationToken, limit string) (*tcqueue.ListArtifactsResponse, error) {
@@ -256,8 +327,34 @@ func (queue *Queue) ListArtifacts(taskId, runId, continuationToken, limit string
 	defer queue.mu.RUnlock()
 	queue.t.Logf("queue.ListArtifacts called with taskId %v and runId %v", taskId, runId)
 	artifacts := []tcqueue.Artifact{}
-	for _, a := range queue.artifacts[taskId+":"+runId] {
-		artifacts = append(artifacts, *a)
+	for name, artifact := range queue.artifacts[taskId+":"+runId] {
+		var a tcqueue.Artifact
+		switch A := artifact.(type) {
+		case *tcqueue.ErrorArtifactRequest:
+			a = tcqueue.Artifact{
+				ContentType: "application/json", // TODO - check this
+				Expires:     A.Expires,
+				Name:        name,
+				StorageType: A.StorageType,
+			}
+		case *tcqueue.RedirectArtifactRequest:
+			a = tcqueue.Artifact{
+				ContentType: A.ContentType,
+				Expires:     A.Expires,
+				Name:        name,
+				StorageType: A.StorageType,
+			}
+		case *tcqueue.S3ArtifactRequest:
+			a = tcqueue.Artifact{
+				ContentType: A.ContentType,
+				Expires:     A.Expires,
+				Name:        name,
+				StorageType: A.StorageType,
+			}
+		default:
+			queue.t.Fatalf("Invalid artifact request type for artifact %#v for task %v runId %v", a, taskId, runId)
+		}
+		artifacts = append(artifacts, a)
 	}
 	return &tcqueue.ListArtifactsResponse{
 		Artifacts: artifacts,
@@ -308,7 +405,7 @@ func (queue *Queue) Task(taskId string) (*tcqueue.TaskDefinitionResponse, error)
 	queue.mu.RLock()
 	defer queue.mu.RUnlock()
 	if _, exists := queue.tasks[taskId]; !exists {
-		queue.t.Log("Returning error")
+		queue.t.Logf("Task definition for task %v not found", taskId)
 		return nil, &tcclient.APICallException{
 			RootCause: httpbackoff.BadHttpResponseCode{
 				HttpResponseCode: 404,
@@ -324,6 +421,6 @@ func NewQueue(t *testing.T) *Queue {
 	return &Queue{
 		t:         t,
 		tasks:     map[string]*tcqueue.TaskDefinitionAndStatus{},
-		artifacts: map[string]map[string]*tcqueue.Artifact{},
+		artifacts: map[string]map[string]interface{}{},
 	}
 }

@@ -12,6 +12,8 @@ import (
 	"github.com/taskcluster/httpbackoff/v3"
 	tcclient "github.com/taskcluster/taskcluster/v30/clients/client-go"
 	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/fileutil"
+	tchttputil "github.com/taskcluster/taskcluster/v30/workers/generic-worker/httputil"
+	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/tc"
 	"github.com/taskcluster/taskcluster/v30/workers/generic-worker/tclog"
 )
 
@@ -19,6 +21,7 @@ type Artifacts struct {
 	t *testing.T
 	// artifacts["<taskId>:<name>"]
 	artifacts map[string]*Artifact
+	queue     tc.Queue
 }
 
 type Artifact struct {
@@ -37,6 +40,18 @@ func (a *Artifacts) Publish(taskId string, runId uint, name, putURL, contentType
 	if err != nil {
 		a.t.Fatalf("Could not read file %v for artifact %v of task %v: %v", file, name, taskId, err)
 	}
+	//	if A, exists := a.artifacts[taskId+":"+name]; exists {
+	//		if contentType != A.contentType || contentEncoding != A.contentEncoding || !reflect.DeepEqual(b, A.data) {
+	//			return &tcclient.APICallException{
+	//				CallSummary: &tcclient.CallSummary{
+	//					HTTPResponseBody: fmt.Sprintf("Conflicting request for task %v run %v artifact %v", taskId, runId, name),
+	//				},
+	//				RootCause: httpbackoff.BadHttpResponseCode{
+	//					HttpResponseCode: 409,
+	//				},
+	//			}
+	//		}
+	//	}
 	a.artifacts[taskId+":"+name] = &Artifact{
 		taskId:          taskId,
 		runId:           runId,
@@ -50,18 +65,31 @@ func (a *Artifacts) Publish(taskId string, runId uint, name, putURL, contentType
 
 func (a *Artifacts) GetLatest(taskId, name, file string, timeout time.Duration, logger tclog.Logger) (sha256, contentEncoding, contentType string, err error) {
 	a.t.Logf("artifacts.GetLatest called with taskId %v", taskId)
+	u, err := a.queue.GetLatestArtifact_SignedURL(taskId, name, timeout)
+	if err != nil {
+		return "", "", "", err
+	}
+	contentSource := "task " + taskId + " artifact " + name
+	logger.Infof("[mounts] Downloading %v to %v", contentSource, file)
+
+	// only reference artifacts return URLs...
+	if u != nil {
+		sha256, contentType, err = tchttputil.DownloadFile(u.String(), "task "+taskId+" artifact "+name, file, logger)
+		contentEncoding = "unknown"
+		return
+	}
+
 	if _, exists := a.artifacts[taskId+":"+name]; !exists {
-		a.t.Log("Returning error")
 		return "", "", "", &tcclient.APICallException{
-			CallSummary: &tcclient.CallSummary{},
+			CallSummary: &tcclient.CallSummary{
+				HTTPResponseBody: "Not found",
+			},
 			RootCause: httpbackoff.BadHttpResponseCode{
 				HttpResponseCode: 404,
 			},
 		}
 	}
 	artifact := a.artifacts[taskId+":"+name]
-	contentSource := "task " + taskId + " artifact " + name
-	logger.Infof("[mounts] Downloading %v to %v", contentSource, file)
 	var size int64
 	size, err = artifact.WriteToDisk(file)
 	if err != nil {
@@ -102,9 +130,10 @@ func (artifact *Artifact) WriteToDisk(file string) (size int64, err error) {
 
 /////////////////////////////////////////////////
 
-func NewArtifacts(t *testing.T) *Artifacts {
+func NewArtifacts(t *testing.T, queue tc.Queue) *Artifacts {
 	return &Artifacts{
 		t:         t,
 		artifacts: map[string]*Artifact{},
+		queue:     queue,
 	}
 }
